@@ -23,11 +23,8 @@ La interfaz incluye navegación inferior en teléfonos, calendario compacto, con
 4. En **Project Settings → API** copia la Project URL y la clave publicable (o anon key heredada).
 
 ## 2. Configurar la aplicación
-Abre `app.js` y sustituye:
-- `PEGA_AQUI_TU_PROJECT_URL` por la URL de tu proyecto.
-- `PEGA_AQUI_TU_PUBLISHABLE_O_ANON_KEY` por la clave pública/publishable (anon).
-
-No introduzcas nunca la `service_role` key en el navegador ni en GitHub.
+La URL del proyecto y la clave publicable de Supabase ya están configuradas en `app.js`.
+La clave publicable se utiliza en el navegador; nunca introduzcas la clave `service_role` en el frontend ni en GitHub.
 
 ## 3. Crear la cuenta administradora
 1. Publica la aplicación siguiendo el paso 4.
