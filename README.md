@@ -26,6 +26,12 @@ La interfaz incluye navegación inferior en teléfonos, calendario compacto, con
 La URL del proyecto y la clave publicable de Supabase ya están configuradas en `app.js`.
 La clave publicable se utiliza en el navegador; nunca introduzcas la clave `service_role` en el frontend ni en GitHub.
 
+En Supabase, abre **Authentication → URL Configuration** y configura:
+- **Site URL** con la URL publicada de la aplicación (por ejemplo, `https://elaipuej.github.io/gestor_vacaciones/` si usas GitHub Pages).
+- **Redirect URLs** con la URL publicada y, para pruebas locales, `http://localhost:3000/**`.
+
+El enlace de confirmación vuelve a la misma dirección desde la que se creó la cuenta. Supabase solo permitirá el retorno si esa dirección está incluida en **Redirect URLs**.
+
 ## 3. Crear la cuenta administradora
 1. Publica la aplicación siguiendo el paso 4.
 2. Abre la web y crea tu cuenta desde **Crear cuenta de trabajador**.

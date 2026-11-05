@@ -34,7 +34,8 @@ async function signup(){
   if(!email||password.length<6){setMessage("auth-message","Introduce un correo y una contraseña de al menos 6 caracteres.");return;}
   const full_name=prompt("¿Cuál es tu nombre y apellidos?");
   if(!full_name)return;
-  const {error}=await db.auth.signUp({email,password,options:{data:{full_name}}});
+  const emailRedirectTo=`${window.location.origin}${window.location.pathname}`;
+  const {error}=await db.auth.signUp({email,password,options:{data:{full_name},emailRedirectTo}});
   if(error)setMessage("auth-message",error.message);
   else setMessage("auth-message","Cuenta creada. Si está activada la confirmación por correo, revisa tu bandeja de entrada. El administrador deberá asignarte los días anuales.");
 }
