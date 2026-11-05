@@ -19,6 +19,7 @@ const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON
 const $ = (id) => document.getElementById(id);
 const state = { user:null, profile:null, profiles:[], loginProfiles:[], requests:[], calendarRequests:[], holidays:[], view:"dashboard", mode:"month", period:new Date(), selectedYear:new Date().getFullYear() };
 const monthNames = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const workerPalette = ["#1d5f91","#9c4a0f","#176b48","#8b3150","#55418a","#75600d","#126b70","#8a3d18","#465f16","#923b8a","#3d4d8c","#4e5965"];
 const fmt = (s) => { if(!s) return "—"; const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"}); };
 const fmtTimestamp = (s) => s ? new Date(s).toLocaleString("es-ES",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
 const dateObj = (s) => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
@@ -130,10 +131,20 @@ function initUser(){
 }
 function myRequests(){return state.requests.filter(r=>r.user_id===state.user.id);}
 function visibleRequests(){return isAdmin()?state.requests:myRequests();}
+function workerColor(id){
+  const index=state.profiles.findIndex(profile=>profile.id===id);
+  return workerPalette[(index<0?0:index)%workerPalette.length];
+}
+function requestsColorStyle(requests){
+  const colors=[...new Set(requests.map(request=>workerColor(request.user_id)))];
+  if(colors.length<2)return colors.length?`--worker-color:${colors[0]}`:"";
+  const stops=colors.map((color,index)=>`${color} ${index*100/colors.length}% ${(index+1)*100/colors.length}%`).join(",");
+  return `background:linear-gradient(135deg,${stops})`;
+}
 function daysUsed(id,year=new Date().getFullYear()){
   return state.requests.filter(r=>r.user_id===id&&r.status==="approved"&&r.start_date.slice(0,4)==String(year)).reduce((n,r)=>n+daysBetween(r.start_date,r.end_date),0);
 }
-function renderAll(){initUser();renderDashboard();renderCalendar();renderRequests();renderEmployees();renderHolidays();renderReports();updatePendingBadge();}
+function renderAll(){initUser();renderDashboard();renderCalendar();renderCalendarLegend();renderRequests();renderEmployees();renderHolidays();renderReports();updatePendingBadge();}
 function updatePendingBadge(){const n=state.requests.filter(r=>r.status==="pending"&&(isAdmin()||r.user_id===state.user.id)).length;$("pending-badge").textContent=n;$("pending-badge").classList.toggle("hidden",!n);}
 function renderDashboard(){
   const requests=visibleRequests();
@@ -151,6 +162,9 @@ function renderDashboard(){
   $("activity-list").innerHTML=recent.length?recent.map(r=>`<div class="list-row"><div><strong>${escapeHtml(profileName(r.user_id))}</strong><small>${fmt(r.start_date)} – ${fmt(r.end_date)}</small></div><span class="pill ${r.status}">${statusText(r.status)}</span></div>`).join(""):`<div class="empty">Todavía no hay solicitudes.</div>`;
 }
 function eventsForDate(date){const s=iso(date);return {requests:state.calendarRequests.filter(r=>r.start_date<=s&&r.end_date>=s),holidays:state.holidays.filter(h=>h.date===s)};}
+function renderCalendarLegend(){
+  $("calendar-legend").innerHTML=`<span><i class="legend-dot status-approved"></i>Aprobada</span><span><i class="legend-dot status-pending"></i>Pendiente</span>`;
+}
 function renderCalendar(){
   if(state.mode==="month"){renderMonth();}else{renderYear();}
 }
@@ -165,7 +179,7 @@ function renderMonth(){
     const d=new Date(gridStart);d.setDate(gridStart.getDate()+i);
     const ev=eventsForDate(d),outside=d.getMonth()!==m;
     let items=ev.holidays.map(h=>`<div class="event holiday" title="${escapeHtml(h.name)}">${escapeHtml(h.name)}</div>`);
-    ev.requests.slice(0,3).forEach(r=>items.push(`<div class="event ${r.status}" title="${escapeHtml(profileName(r.user_id))}">${escapeHtml(profileName(r.user_id).split(" ")[0])}</div>`));
+    ev.requests.slice(0,3).forEach(r=>items.push(`<div class="event ${r.status}" style="--worker-color:${workerColor(r.user_id)}" title="${escapeHtml(profileName(r.user_id))} · ${statusText(r.status)}">${escapeHtml(profileName(r.user_id).split(" ")[0])}</div>`));
     cells.push(`<div class="day-cell ${outside?"outside":""}"><div class="day-number">${d.getDate()}</div><div class="day-events">${items.join("")}</div></div>`);
   }
   $("calendar-content").innerHTML=`<div class="month-grid">${cells.join("")}</div>`;
@@ -176,17 +190,30 @@ function renderYear(){
     const first=new Date(y,m,1),days=new Date(y,m+1,0).getDate(),offset=(first.getDay()+6)%7,arr=[];
     ["L","M","X","J","V","S","D"].forEach(x=>arr.push(`<span>${x}</span>`));
     for(let i=0;i<offset;i++)arr.push("<span></span>");
-    for(let d=1;d<=days;d++){const date=new Date(y,m,d),ev=eventsForDate(date);arr.push(`<span class="${ev.holidays.length?"has-holiday":ev.requests.length?"has-event":""}" title="${[...ev.holidays.map(h=>h.name),...ev.requests.map(r=>profileName(r.user_id))].join(", ")}">${d}</span>`);}
+    for(let d=1;d<=days;d++){const date=new Date(y,m,d),ev=eventsForDate(date),classes=[ev.holidays.length?"has-holiday":"",ev.requests.length?"has-event":""].filter(Boolean).join(" "),style=requestsColorStyle(ev.requests);arr.push(`<span class="${classes}" ${style?`style="${style}"`:""} title="${escapeHtml([...ev.holidays.map(h=>h.name),...ev.requests.map(r=>`${profileName(r.user_id)} · ${statusText(r.status)}`)].join(", "))}">${d}</span>`);}
     return `<div class="mini-month"><h4>${name[0].toUpperCase()+name.slice(1)}</h4><div class="mini-days">${arr.join("")}</div></div>`;
   }).join("");
   $("calendar-content").innerHTML=`<div class="year-grid">${months}</div>`;
+}
+function overlappingRequests(request){
+  return state.calendarRequests.filter(other=>other.user_id!==request.user_id&&other.start_date<=request.end_date&&other.end_date>=request.start_date);
+}
+function conflictNotice(request){
+  const conflicts=overlappingRequests(request);
+  if(!conflicts.length)return "";
+  const details=conflicts.map(other=>`${escapeHtml(profileName(other.user_id))} · ${fmt(other.start_date)} – ${fmt(other.end_date)} (${statusText(other.status)})`);
+  return `<div class="request-conflict" role="status"><strong>Coincide con otro trabajador</strong><span>${details.join(" · ")}</span></div>`;
 }
 function renderRequests(){
   const filter=$("request-filter").value;
   let rows=[...visibleRequests()];
   if(filter!=="all")rows=rows.filter(r=>r.status===filter);
   rows.sort((a,b)=>a.created_at.localeCompare(b.created_at));
-  $("requests-list").innerHTML=rows.length?`<table class="data-table"><thead><tr><th>Trabajador</th><th>Solicitada</th><th>Periodo</th><th>Días</th><th>Estado</th><th>Observaciones</th><th>Comentario administrador</th><th>Acciones</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(profileName(r.user_id))}</strong></td><td>${fmtTimestamp(r.created_at)}</td><td>${fmt(r.start_date)} – ${fmt(r.end_date)}</td><td>${daysBetween(r.start_date,r.end_date)}</td><td><span class="pill ${r.status}">${statusText(r.status)}</span></td><td>${escapeHtml(r.notes||"—")}</td><td>${escapeHtml(r.review_comment||"—")}</td><td>${isAdmin()&&r.status==="pending"?`<div class="table-actions"><button class="small-action approve" data-action="approve" data-id="${r.id}">Aprobar</button><button class="small-action reject" data-action="reject" data-id="${r.id}">Rechazar</button></div>`:"—"}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No hay solicitudes para mostrar.</div>`;
+  if(!rows.length){$("requests-list").innerHTML=`<div class="empty">No hay solicitudes para mostrar.</div>`;return;}
+  const actions=r=>isAdmin()&&r.status==="pending"?`<div class="table-actions"><button class="small-action approve" data-action="approve" data-id="${r.id}">Aprobar</button><button class="small-action reject" data-action="reject" data-id="${r.id}">Rechazar</button></div>`:"—";
+  const table=`<div class="requests-table-view"><table class="data-table"><thead><tr><th>Trabajador</th><th>Solicitada</th><th>Periodo</th><th>Días</th><th>Estado</th><th>Observaciones</th><th>Comentario administrador</th><th>Acciones</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(profileName(r.user_id))}</strong></td><td>${fmtTimestamp(r.created_at)}</td><td>${fmt(r.start_date)} – ${fmt(r.end_date)}${conflictNotice(r)}</td><td>${daysBetween(r.start_date,r.end_date)}</td><td><span class="pill ${r.status}">${statusText(r.status)}</span></td><td>${escapeHtml(r.notes||"—")}</td><td>${escapeHtml(r.review_comment||"—")}</td><td>${actions(r)}</td></tr>`).join("")}</tbody></table></div>`;
+  const cards=`<div class="request-cards">${rows.map(r=>`<article class="request-card"><div class="request-card-head"><strong>${escapeHtml(profileName(r.user_id))}</strong><span class="pill ${r.status}">${statusText(r.status)}</span></div><p class="request-created">Solicitada ${fmtTimestamp(r.created_at)}</p><div class="request-period"><span>Periodo</span><strong>${fmt(r.start_date)} – ${fmt(r.end_date)}</strong><span>${daysBetween(r.start_date,r.end_date)} días naturales</span></div>${conflictNotice(r)}<div class="request-notes"><span>Observaciones</span><p>${escapeHtml(r.notes||"—")}</p></div><div class="request-notes"><span>Comentario administrador</span><p>${escapeHtml(r.review_comment||"—")}</p></div>${actions(r)!=="—"?`<div class="request-card-actions">${actions(r)}</div>`:""}</article>`).join("")}</div>`;
+  $("requests-list").innerHTML=table+cards;
 }
 function renderEmployees(){
   if(!isAdmin())return;

@@ -118,3 +118,26 @@
   .top-actions .status-dot, .top-actions #top-user { display: none; }
   .mobile-logout { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; white-space: nowrap; }
 }
+.event.approved { background: var(--worker-color); color: #fff; }
+.event.pending { background: #fff; color: var(--worker-color); border: 1px dashed var(--worker-color); }
+.mini-days span.has-event { background: var(--worker-color); color: #fff; border-radius: 4px; }
+.legend-dot.status-approved { background: #344054; }
+.legend-dot.status-pending { background: #fff; border: 1px dashed #344054; }
+.legend-dot.worker-color { background: var(--worker-color); }
+.request-cards { display: none; }
+.request-conflict { display: grid; gap: 3px; margin-top: 8px; padding: 8px 10px; border-left: 3px solid #c77924; border-radius: 3px; background: #fff5e8; color: #72400b; font-size: 11px; line-height: 1.4; }
+.request-conflict span { color: #805c37; }
+.request-card { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.request-card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.request-created { margin: 5px 0 12px; color: var(--muted); font-size: 11px; }
+.request-period { display: grid; gap: 4px; }
+.request-period > span:first-child, .request-notes > span { color: var(--muted); font-size: 11px; font-weight: 700; }
+.request-period > span:last-child { color: var(--muted); font-size: 12px; }
+.request-notes { margin-top: 12px; }
+.request-notes p { margin: 4px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.request-card-actions { margin-top: 12px; }
+@media (max-width: 680px) {
+  #requests-list.table-panel { padding: 0; overflow: visible; border: 0; background: transparent; box-shadow: none; }
+  .requests-table-view { display: none; }
+  .request-cards { display: grid; gap: 10px; }
+}

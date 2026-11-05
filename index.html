@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14243a">
   <title>Gestor de Vacaciones</title>
-  <link rel="stylesheet" href="styles.css?v=20261105-5">
+  <link rel="stylesheet" href="styles.css?v=20261105-8">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -25,7 +25,7 @@
         <button class="secondary full" id="show-signup" type="button">Crear cuenta de trabajador</button>
       </form>
       <form id="signup-form" class="hidden">
-        <label>Nombre de usuario<input id="signup-username" type="text" autocomplete="username" required minlength="3" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,28}[A-Za-z0-9]" placeholder="Ej. Usuario3" title="Usa entre 3 y 30 letras, números, guion o guion bajo"></label>
+        <label>Nombre de usuario<input id="signup-username" type="text" autocomplete="username" required minlength="3" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{1,28}[A-Za-z0-9]" placeholder="Ej. Usuario3" title="Usa entre 3 y 30 letras, números, guion o guion bajo"></label>
         <label>Contraseña<input id="signup-password" type="password" autocomplete="new-password" required minlength="8" placeholder="Mínimo 8 caracteres"></label>
         <label>Confirmar contraseña<input id="signup-password-confirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Repite la contraseña"></label>
         <button class="primary full" id="signup-submit">Crear cuenta</button>
@@ -77,7 +77,7 @@
       <section id="view-calendar" class="view">
         <div class="toolbar"><div class="segmented"><button class="selected" data-mode="month">Mensual</button><button data-mode="year">Anual</button></div><div class="calendar-controls"><button class="icon-btn" id="prev-period">‹</button><strong id="period-label"></strong><button class="icon-btn" id="next-period">›</button><button class="secondary compact" id="today-btn">Hoy</button></div></div>
         <div id="calendar-content"></div>
-        <div class="legend"><span><i class="legend-dot approved"></i> Aprobadas</span><span><i class="legend-dot pending"></i> Pendientes</span><span><i class="legend-dot holiday"></i> Festivos</span></div>
+        <div class="legend" id="calendar-legend"></div>
       </section>
 
       <section id="view-requests" class="view">
@@ -119,11 +119,11 @@
   </dialog>
   <dialog id="days-dialog" class="modal small-modal">
     <form id="days-form" method="dialog"><div class="modal-head"><h2>Editar días anuales</h2><button type="button" class="close-btn" id="close-days">×</button></div><input type="hidden" id="days-user-id"><label>Días naturales anuales<input type="number" id="days-value" min="0" max="365" required></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-days">Cancelar</button><button class="primary">Guardar</button></div></form>
-    <dialog id="review-dialog" class="modal small-modal">
-      <form id="review-form" method="dialog"><div class="modal-head"><div><p class="eyebrow">REVISIÓN</p><h2 id="review-title">Revisar solicitud</h2></div><button type="button" class="close-btn" id="close-review">×</button></div><input type="hidden" id="review-request-id"><input type="hidden" id="review-status"><label>Comentario para el trabajador<textarea id="review-comment" rows="4" maxlength="1000" placeholder="Añade el motivo o algún detalle (opcional)"></textarea></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-review">Cancelar</button><button class="primary">Guardar decisión</button></div></form>
-    </dialog>
+  </dialog>
+  <dialog id="review-dialog" class="modal small-modal">
+    <form id="review-form" method="dialog"><div class="modal-head"><div><p class="eyebrow">REVISIÓN</p><h2 id="review-title">Revisar solicitud</h2></div><button type="button" class="close-btn" id="close-review">×</button></div><input type="hidden" id="review-request-id"><input type="hidden" id="review-status"><label>Comentario para el trabajador<textarea id="review-comment" rows="4" maxlength="1000" placeholder="Añade el motivo o algún detalle (opcional)"></textarea></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-review">Cancelar</button><button class="primary">Guardar decisión</button></div></form>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=20261105-5"></script>
+  <script src="app.js?v=20261105-8"></script>
 </body>
 </html>
