@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14243a">
+  <title>Gestor de Vacaciones</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div id="login-screen" class="login-wrap">
+    <div class="login-card">
+      <div class="brand-mark">GV</div>
+      <p class="eyebrow">GESTIÓN DE PERSONAL</p>
+      <h1>Gestor de vacaciones</h1>
+      <p class="muted">Accede para consultar o gestionar las vacaciones del equipo.</p>
+      <div id="config-warning" class="notice warning hidden">Antes de entrar, configura la URL y la clave pública de tu proyecto Supabase en <code>app.js</code>.</div>
+      <form id="auth-form">
+        <label>Correo electrónico<input id="email" type="email" autocomplete="username" required placeholder="nombre@empresa.com"></label>
+        <label>Contraseña<input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Tu contraseña"></label>
+        <button class="primary full" id="login-btn">Iniciar sesión</button>
+        <button class="secondary full" id="signup-btn" type="button">Crear cuenta de trabajador</button>
+      </form>
+      <p id="auth-message" class="message" aria-live="polite"></p>
+      <p class="tiny muted">El acceso requiere una cuenta autorizada. Los datos se guardan en tu base de datos privada.</p>
+    </div>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark small">GV</div><div><strong>Gestor</strong><span>de vacaciones</span></div></div>
+      <nav id="nav">
+        <button class="nav-item active" data-view="dashboard">▦ <span>Resumen</span></button>
+        <button class="nav-item" data-view="calendar">▦ <span>Calendario</span></button>
+        <button class="nav-item" data-view="requests">☷ <span>Solicitudes</span><b id="pending-badge" class="nav-badge hidden">0</b></button>
+        <button class="nav-item admin-only" data-view="employees">♙ <span>Trabajadores</span></button>
+        <button class="nav-item admin-only" data-view="holidays">◇ <span>Festivos</span></button>
+        <button class="nav-item" data-view="reports">⇩ <span>Informes</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="user-mini"><div class="avatar" id="user-avatar">U</div><div><strong id="user-name">Usuario</strong><span id="user-role">Trabajador</span></div></div>
+        <button id="logout-btn" class="logout">↪ Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow" id="date-label">GESTIÓN DE VACACIONES</p><h1 id="page-title">Resumen</h1></div>
+        <div class="top-actions"><span class="status-dot"></span><span id="top-user">Conectado</span></div>
+      </header>
+
+      <section id="view-dashboard" class="view active">
+        <div class="welcome-row"><div><h2 id="welcome-title">Hola</h2><p class="muted">Este es el estado actual de las vacaciones del equipo.</p></div><button class="primary" id="quick-request">＋ Solicitar vacaciones</button></div>
+        <div class="stats-grid">
+          <article class="stat-card"><span class="stat-icon blue">♙</span><p>Trabajadores</p><strong id="stat-employees">—</strong><small>Usuarios registrados</small></article>
+          <article class="stat-card"><span class="stat-icon green">✓</span><p>Días aprobados</p><strong id="stat-approved">—</strong><small>En el año seleccionado</small></article>
+          <article class="stat-card"><span class="stat-icon orange">◷</span><p>Pendientes</p><strong id="stat-pending">—</strong><small>Solicitudes por revisar</small></article>
+          <article class="stat-card"><span class="stat-icon purple">▣</span><p>Mis días disponibles</p><strong id="stat-remaining">—</strong><small id="remaining-caption">Días naturales</small></article>
+        </div>
+        <div class="content-grid">
+          <article class="panel"><div class="panel-head"><div><h3>Próximas vacaciones</h3><p class="muted">Solicitudes aprobadas próximas</p></div><button class="text-button" data-goto="calendar">Ver calendario →</button></div><div id="upcoming-list" class="list"></div></article>
+          <article class="panel"><div class="panel-head"><div><h3>Actividad reciente</h3><p class="muted">Últimas solicitudes</p></div></div><div id="activity-list" class="list"></div></article>
+        </div>
+      </section>
+
+      <section id="view-calendar" class="view">
+        <div class="toolbar"><div class="segmented"><button class="selected" data-mode="month">Mensual</button><button data-mode="year">Anual</button></div><div class="calendar-controls"><button class="icon-btn" id="prev-period">‹</button><strong id="period-label"></strong><button class="icon-btn" id="next-period">›</button><button class="secondary compact" id="today-btn">Hoy</button></div></div>
+        <div id="calendar-content"></div>
+        <div class="legend"><span><i class="legend-dot approved"></i> Aprobadas</span><span><i class="legend-dot pending"></i> Pendientes</span><span><i class="legend-dot holiday"></i> Festivos</span></div>
+      </section>
+
+      <section id="view-requests" class="view">
+        <div class="section-intro"><div><h2>Solicitudes</h2><p class="muted">Consulta, solicita y gestiona los periodos de vacaciones.</p></div><button class="primary" id="new-request">＋ Nueva solicitud</button></div>
+        <div class="filter-row"><select id="request-filter"><option value="all">Todas las solicitudes</option><option value="pending">Pendientes</option><option value="approved">Aprobadas</option><option value="rejected">Rechazadas</option></select></div>
+        <div id="requests-list" class="panel table-panel"></div>
+      </section>
+
+      <section id="view-employees" class="view">
+        <div class="section-intro"><div><h2>Trabajadores</h2><p class="muted">Usuarios que han creado una cuenta en la aplicación.</p></div></div>
+        <div class="notice info">Los trabajadores crean su cuenta desde la pantalla de acceso. Aquí puedes ajustar sus días anuales. Para dar permisos de administrador, sigue las instrucciones de configuración del archivo README.</div>
+        <div id="employees-list" class="panel table-panel"></div>
+      </section>
+
+      <section id="view-holidays" class="view">
+        <div class="section-intro"><div><h2>Festivos</h2><p class="muted">Añade festivos nacionales, autonómicos y locales del centro de trabajo.</p></div></div>
+        <form id="holiday-form" class="panel inline-form"><label>Fecha<input type="date" id="holiday-date" required></label><label>Descripción<input id="holiday-name" required placeholder="Ej. Fiesta local"></label><button class="primary">Añadir festivo</button></form>
+        <div id="holidays-list" class="panel table-panel"></div>
+      </section>
+
+      <section id="view-reports" class="view">
+        <div class="section-intro"><div><h2>Informes</h2><p class="muted">Descarga un resumen en formato Excel compatible.</p></div><button class="primary" id="export-excel">⇩ Exportar a Excel</button></div>
+        <div class="panel"><h3>Contenido del informe</h3><p class="muted">El archivo incluye las solicitudes visibles para tu perfil, sus fechas, duración, estado y observaciones. Los administradores pueden exportar todas las solicitudes.</p><div id="report-summary" class="report-summary"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="request-dialog" class="modal">
+    <form id="request-form" method="dialog">
+      <div class="modal-head"><div><p class="eyebrow">NUEVA SOLICITUD</p><h2>Solicitar vacaciones</h2></div><button type="button" class="close-btn" id="close-request">×</button></div>
+      <label class="admin-only hidden" id="request-worker-label">Trabajador<select id="request-worker"></select></label>
+      <div class="form-grid"><label>Fecha de inicio<input type="date" id="start-date" required></label><label>Fecha de fin<input type="date" id="end-date" required></label></div>
+      <div id="day-preview" class="day-preview">Selecciona las fechas para calcular los días naturales.</div>
+      <label>Observaciones (opcional)<textarea id="request-notes" rows="3" placeholder="Añade algún comentario..."></textarea></label>
+      <div id="conflict-warning" class="notice warning hidden"></div>
+      <p id="request-error" class="message"></p>
+      <div class="modal-actions"><button type="button" class="secondary" id="cancel-request">Cancelar</button><button class="primary" id="submit-request">Enviar solicitud</button></div>
+    </form>
+  </dialog>
+  <dialog id="days-dialog" class="modal small-modal">
+    <form id="days-form" method="dialog"><div class="modal-head"><h2>Editar días anuales</h2><button type="button" class="close-btn" id="close-days">×</button></div><input type="hidden" id="days-user-id"><label>Días naturales anuales<input type="number" id="days-value" min="0" max="365" required></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-days">Cancelar</button><button class="primary">Guardar</button></div></form>
+  </dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
