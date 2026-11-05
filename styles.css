@@ -113,3 +113,8 @@
 }
 #auth-form .remember-option { display: flex; align-items: center; gap: 9px; font-size: 12px; font-weight: 500; cursor: pointer; }
 #auth-form .remember-option input { width: 16px; height: 16px; min-height: 16px; margin: 0; padding: 0; accent-color: var(--blue); }
+.mobile-logout { display: none; }
+@media (max-width: 680px) {
+  .top-actions .status-dot, .top-actions #top-user { display: none; }
+  .mobile-logout { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 10px; white-space: nowrap; }
+}

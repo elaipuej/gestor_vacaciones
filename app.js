@@ -17,7 +17,7 @@ const rememberInput=document.getElementById("remember-session");
 if(rememberInput)rememberInput.checked=localStorage.getItem(rememberKey)==="true";
 const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{storage:authStorage}}) : null;
 const $ = (id) => document.getElementById(id);
-const state = { user:null, profile:null, profiles:[], loginProfiles:[], requests:[], holidays:[], view:"dashboard", mode:"month", period:new Date(), selectedYear:new Date().getFullYear() };
+const state = { user:null, profile:null, profiles:[], loginProfiles:[], requests:[], calendarRequests:[], holidays:[], view:"dashboard", mode:"month", period:new Date(), selectedYear:new Date().getFullYear() };
 const monthNames = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const fmt = (s) => { if(!s) return "—"; const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"}); };
 const fmtTimestamp = (s) => s ? new Date(s).toLocaleString("es-ES",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
@@ -42,6 +42,39 @@ async function authSubmit(e){
   const password=$("password").value;
   const {error}=await db.auth.signInWithPassword({email:selected.email,password});
   if(error)setMessage("auth-message",error.message);
+}
+function showSignup(){
+  setMessage("auth-message","");
+  $("auth-form").classList.add("hidden");
+  $("signup-form").classList.remove("hidden");
+}
+function showLoginForm(){
+  setMessage("auth-message","");
+  $("signup-form").classList.add("hidden");
+  $("auth-form").classList.remove("hidden");
+}
+async function signup(e){
+  e.preventDefault(); if(!db)return;
+  setMessage("auth-message","");
+  const username=$("signup-username").value.trim();
+  const password=$("signup-password").value;
+  const confirmation=$("signup-password-confirm").value;
+  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{1,28}[A-Za-z0-9]$/.test(username)){
+    setMessage("auth-message","El usuario debe tener entre 3 y 30 caracteres: letras, números, guion o guion bajo.");return;
+  }
+  if(password!==confirmation){setMessage("auth-message","Las contraseñas no coinciden.");return;}
+  $("signup-submit").disabled=true;
+  const email=`${username.toLowerCase()}@usuarios.gestor-vacaciones.invalid`;
+  const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:username}}});
+  $("signup-submit").disabled=false;
+  if(error){
+    const duplicate=error.message.toLowerCase().includes("already registered")||error.message.toLowerCase().includes("duplicate key");
+    setMessage("auth-message",duplicate?"Ese nombre de usuario ya está registrado.":error.message);return;
+  }
+  if(!data.session){
+    setMessage("auth-message","La cuenta se creó, pero falta desactivar la confirmación por correo en Supabase para poder entrar sin email.");return;
+  }
+  await loadLoginProfiles();
 }
 async function loadLoginProfiles(){
   const select=$("login-user"),retry=$("retry-users");
@@ -73,13 +106,14 @@ async function loadLoginProfiles(){
 }
 async function logout(){await db.auth.signOut();state.user=null;state.profile=null;showLogin();}
 async function loadData(){
-  const [p,r,h]=await Promise.all([
+  const [p,r,c,h]=await Promise.all([
     db.from("profiles").select("id,full_name,role,annual_days,created_at").order("full_name"),
     db.from("vacation_requests").select("*").order("created_at",{ascending:false}),
+    db.rpc("list_calendar_requests"),
     db.from("holidays").select("*").order("date")
   ]);
-  if(p.error||r.error||h.error){toast((p.error||r.error||h.error).message);return;}
-  state.profiles=p.data||[];state.requests=r.data||[];state.holidays=h.data||[];
+  if(p.error||r.error||c.error||h.error){toast((p.error||r.error||c.error||h.error).message);return;}
+  state.profiles=p.data||[];state.requests=r.data||[];state.calendarRequests=c.data||[];state.holidays=h.data||[];
   state.profile=state.profiles.find(x=>x.id===state.user.id);
   if(!state.profile){toast("No se ha encontrado tu perfil. Contacta con el administrador.");return;}
   renderAll();
@@ -95,26 +129,28 @@ function initUser(){
   $("request-worker").innerHTML=state.profiles.map(p=>`<option value="${p.id}">${escapeHtml(p.full_name)}</option>`).join("");
 }
 function myRequests(){return state.requests.filter(r=>r.user_id===state.user.id);}
+function visibleRequests(){return isAdmin()?state.requests:myRequests();}
 function daysUsed(id,year=new Date().getFullYear()){
   return state.requests.filter(r=>r.user_id===id&&r.status==="approved"&&r.start_date.slice(0,4)==String(year)).reduce((n,r)=>n+daysBetween(r.start_date,r.end_date),0);
 }
 function renderAll(){initUser();renderDashboard();renderCalendar();renderRequests();renderEmployees();renderHolidays();renderReports();updatePendingBadge();}
 function updatePendingBadge(){const n=state.requests.filter(r=>r.status==="pending"&&(isAdmin()||r.user_id===state.user.id)).length;$("pending-badge").textContent=n;$("pending-badge").classList.toggle("hidden",!n);}
 function renderDashboard(){
-  const year=new Date().getFullYear(), approved=state.requests.filter(r=>r.status==="approved"&&r.start_date.startsWith(String(year)));
-  const pending=state.requests.filter(r=>r.status==="pending"&&(isAdmin()||r.user_id===state.user.id));
+  const requests=visibleRequests();
+  const year=new Date().getFullYear(), approved=requests.filter(r=>r.status==="approved"&&r.start_date.startsWith(String(year)));
+  const pending=requests.filter(r=>r.status==="pending");
   const remaining=(state.profile.annual_days||30)-daysUsed(state.user.id,year);
   $("stat-employees").textContent=isAdmin()?state.profiles.length:"—";
   $("stat-approved").textContent=approved.reduce((n,r)=>n+daysBetween(r.start_date,r.end_date),0);
   $("stat-pending").textContent=pending.length;
   $("stat-remaining").textContent=remaining;
   $("remaining-caption").textContent=`De ${(state.profile.annual_days??30)} días naturales · ${year}`;
-  const upcoming=state.requests.filter(r=>r.status==="approved"&&r.end_date>=iso(new Date())).sort((a,b)=>a.start_date.localeCompare(b.start_date)).slice(0,5);
+  const upcoming=requests.filter(r=>r.status==="approved"&&r.end_date>=iso(new Date())).sort((a,b)=>a.start_date.localeCompare(b.start_date)).slice(0,5);
   $("upcoming-list").innerHTML=upcoming.length?upcoming.map(r=>`<div class="list-row"><div><strong>${escapeHtml(profileName(r.user_id))}</strong><small>${fmt(r.start_date)} – ${fmt(r.end_date)} · ${daysBetween(r.start_date,r.end_date)} días</small></div><span class="pill approved">Aprobada</span></div>`).join(""):`<div class="empty">No hay próximas vacaciones aprobadas.</div>`;
-  const recent=state.requests.slice(0,5);
+  const recent=requests.slice(0,5);
   $("activity-list").innerHTML=recent.length?recent.map(r=>`<div class="list-row"><div><strong>${escapeHtml(profileName(r.user_id))}</strong><small>${fmt(r.start_date)} – ${fmt(r.end_date)}</small></div><span class="pill ${r.status}">${statusText(r.status)}</span></div>`).join(""):`<div class="empty">Todavía no hay solicitudes.</div>`;
 }
-function eventsForDate(date){const s=iso(date);return {requests:state.requests.filter(r=>r.status!=="rejected"&&r.start_date<=s&&r.end_date>=s),holidays:state.holidays.filter(h=>h.date===s)};}
+function eventsForDate(date){const s=iso(date);return {requests:state.calendarRequests.filter(r=>r.start_date<=s&&r.end_date>=s),holidays:state.holidays.filter(h=>h.date===s)};}
 function renderCalendar(){
   if(state.mode==="month"){renderMonth();}else{renderYear();}
 }
@@ -147,7 +183,7 @@ function renderYear(){
 }
 function renderRequests(){
   const filter=$("request-filter").value;
-  let rows=[...state.requests];
+  let rows=[...visibleRequests()];
   if(filter!=="all")rows=rows.filter(r=>r.status===filter);
   rows.sort((a,b)=>a.created_at.localeCompare(b.created_at));
   $("requests-list").innerHTML=rows.length?`<table class="data-table"><thead><tr><th>Trabajador</th><th>Solicitada</th><th>Periodo</th><th>Días</th><th>Estado</th><th>Observaciones</th><th>Comentario administrador</th><th>Acciones</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(profileName(r.user_id))}</strong></td><td>${fmtTimestamp(r.created_at)}</td><td>${fmt(r.start_date)} – ${fmt(r.end_date)}</td><td>${daysBetween(r.start_date,r.end_date)}</td><td><span class="pill ${r.status}">${statusText(r.status)}</span></td><td>${escapeHtml(r.notes||"—")}</td><td>${escapeHtml(r.review_comment||"—")}</td><td>${isAdmin()&&r.status==="pending"?`<div class="table-actions"><button class="small-action approve" data-action="approve" data-id="${r.id}">Aprobar</button><button class="small-action reject" data-action="reject" data-id="${r.id}">Rechazar</button></div>`:"—"}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No hay solicitudes para mostrar.</div>`;
@@ -161,7 +197,7 @@ function renderHolidays(){
   $("holidays-list").innerHTML=state.holidays.length?`<table class="data-table"><thead><tr><th>Fecha</th><th>Festivo</th><th></th></tr></thead><tbody>${state.holidays.map(h=>`<tr><td>${fmt(h.date)}</td><td><strong>${escapeHtml(h.name)}</strong></td><td><button class="small-action reject" data-delete-holiday="${h.id}">Eliminar</button></td></tr>`).join("")}</tbody></table>`:`<div class="empty">Todavía no has añadido festivos.</div>`;
 }
 function renderReports(){
-  const rows=state.requests;
+  const rows=visibleRequests();
   $("report-summary").innerHTML=`<div><strong>${rows.length}</strong><span>Solicitudes visibles</span></div><div><strong>${rows.filter(r=>r.status==="approved").length}</strong><span>Aprobadas</span></div><div><strong>${rows.filter(r=>r.status==="pending").length}</strong><span>Pendientes</span></div>`;
 }
 function openRequest(){
@@ -178,7 +214,7 @@ function checkRequestPreview(){
   if(b<a){$("day-preview").textContent="La fecha final no puede ser anterior a la inicial.";return;}
   const n=daysBetween(a,b),userId=isAdmin()?$("request-worker").value:state.user.id;
   $("day-preview").textContent=`${n} día(s) natural(es), contando inicio y fin.`;
-  const conflicts=state.requests.filter(r=>r.status!=="rejected"&&r.user_id!==userId&&r.start_date<=b&&r.end_date>=a);
+  const conflicts=state.calendarRequests.filter(r=>r.status!=="rejected"&&r.user_id!==userId&&r.start_date<=b&&r.end_date>=a);
   const holidayCount=state.holidays.filter(h=>h.date>=a&&h.date<=b).length;
   if(conflicts.length){$("conflict-warning").textContent=`Aviso: ${conflicts.length} solicitud(es) de otros trabajadores coinciden total o parcialmente con estas fechas. La solicitud podrá enviarse, pero conviene revisar la cobertura del equipo.`;$("conflict-warning").classList.remove("hidden");}
   else $("conflict-warning").classList.add("hidden");
@@ -226,7 +262,7 @@ async function saveDays(e){
 }
 function exportExcel(){
   if(!window.XLSX){toast("No se ha podido cargar el módulo Excel. Comprueba tu conexión.");return;}
-  const rows=state.requests.map(r=>({"Trabajador":profileName(r.user_id),"Solicitada":fmtTimestamp(r.created_at),"Inicio":r.start_date,"Fin":r.end_date,"Días naturales":daysBetween(r.start_date,r.end_date),"Estado":statusText(r.status),"Observaciones":r.notes||"","Comentario administrador":r.review_comment||""}));
+  const rows=visibleRequests().map(r=>({"Trabajador":profileName(r.user_id),"Solicitada":fmtTimestamp(r.created_at),"Inicio":r.start_date,"Fin":r.end_date,"Días naturales":daysBetween(r.start_date,r.end_date),"Estado":statusText(r.status),"Observaciones":r.notes||"","Comentario administrador":r.review_comment||""}));
   const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Vacaciones");
   const hol=state.holidays.map(h=>({"Fecha":h.date,"Festivo":h.name}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(hol),"Festivos");
   XLSX.writeFile(wb,`vacaciones-${new Date().getFullYear()}.xlsx`);
@@ -238,7 +274,8 @@ function navigate(view){
   $("page-title").textContent=({dashboard:"Resumen",calendar:"Calendario",requests:"Solicitudes",employees:"Trabajadores",holidays:"Festivos",reports:"Informes"})[view];
 }
 function bindEvents(){
-  $("auth-form").addEventListener("submit",authSubmit);$("logout-btn").addEventListener("click",logout);
+  $("auth-form").addEventListener("submit",authSubmit);$("logout-btn").addEventListener("click",logout);$("logout-btn-mobile").addEventListener("click",logout);
+  $("show-signup").addEventListener("click",showSignup);$("cancel-signup").addEventListener("click",showLoginForm);$("signup-form").addEventListener("submit",signup);
   $("retry-users").addEventListener("click",loadLoginProfiles);
   $("remember-session").addEventListener("change",e=>localStorage.setItem(rememberKey,String(e.target.checked)));
   document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.view)));

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14243a">
   <title>Gestor de Vacaciones</title>
-  <link rel="stylesheet" href="styles.css?v=20261105-2">
+  <link rel="stylesheet" href="styles.css?v=20261105-5">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -22,10 +22,18 @@
         <label>Contraseña<input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Tu contraseña"></label>
         <label class="remember-option"><input id="remember-session" type="checkbox"><span>Mantener sesión iniciada</span></label>
         <button class="primary full" id="login-btn" disabled>Iniciar sesión</button>
+        <button class="secondary full" id="show-signup" type="button">Crear cuenta de trabajador</button>
+      </form>
+      <form id="signup-form" class="hidden">
+        <label>Nombre de usuario<input id="signup-username" type="text" autocomplete="username" required minlength="3" maxlength="30" pattern="[A-Za-z0-9][A-Za-z0-9_-]{1,28}[A-Za-z0-9]" placeholder="Ej. Usuario3" title="Usa entre 3 y 30 letras, números, guion o guion bajo"></label>
+        <label>Contraseña<input id="signup-password" type="password" autocomplete="new-password" required minlength="8" placeholder="Mínimo 8 caracteres"></label>
+        <label>Confirmar contraseña<input id="signup-password-confirm" type="password" autocomplete="new-password" required minlength="8" placeholder="Repite la contraseña"></label>
+        <button class="primary full" id="signup-submit">Crear cuenta</button>
+        <button class="secondary full" id="cancel-signup" type="button">Volver al inicio de sesión</button>
       </form>
       <p id="auth-message" class="message" aria-live="polite"></p>
       <button class="secondary full hidden" id="retry-users" type="button">Volver a cargar usuarios</button>
-      <p class="tiny muted">Si no aparece tu nombre, solicita al administrador que cree tu cuenta.</p>
+      <p class="tiny muted">No necesitas correo para crear una cuenta. Si olvidas tu contraseña, solicita ayuda al administrador.</p>
     </div>
   </div>
 
@@ -49,7 +57,7 @@
     <main class="main">
       <header class="topbar">
         <div><p class="eyebrow" id="date-label">GESTIÓN DE VACACIONES</p><h1 id="page-title">Resumen</h1></div>
-        <div class="top-actions"><span class="status-dot"></span><span id="top-user">Conectado</span></div>
+        <div class="top-actions"><span class="status-dot"></span><span id="top-user">Conectado</span><button id="logout-btn-mobile" class="secondary mobile-logout" type="button">↪ Cerrar sesión</button></div>
       </header>
 
       <section id="view-dashboard" class="view active">
@@ -116,6 +124,6 @@
     </dialog>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=20261105-2"></script>
+  <script src="app.js?v=20261105-5"></script>
 </body>
 </html>

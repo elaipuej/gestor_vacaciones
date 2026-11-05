@@ -12,6 +12,9 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists profiles_full_name_lower_idx
+  on public.profiles (lower(full_name));
+
 create table if not exists public.vacation_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -71,6 +74,22 @@ $$;
 revoke all on function public.list_login_profiles() from public, anon, authenticated;
 grant execute on function public.list_login_profiles() to anon, authenticated;
 
+-- Compartir solo los datos necesarios para el calendario del equipo.
+create or replace function public.list_calendar_requests()
+returns table (user_id uuid, start_date date, end_date date, status text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select r.user_id, r.start_date, r.end_date, r.status
+  from public.vacation_requests as r
+  where r.status in ('pending', 'approved');
+$$;
+
+revoke all on function public.list_calendar_requests() from public, anon, authenticated;
+grant execute on function public.list_calendar_requests() to authenticated;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
@@ -90,12 +109,12 @@ drop policy if exists "profiles_update_admin" on public.profiles;
 create policy "profiles_update_admin" on public.profiles
 for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
--- Todos los usuarios autenticados pueden consultar las solicitudes del equipo.
+-- Los trabajadores solo consultan sus solicitudes; el administrador consulta todas.
 drop policy if exists "requests_read_own_or_approved_or_admin" on public.vacation_requests;
 drop policy if exists "requests_read_authenticated" on public.vacation_requests;
-create policy "requests_read_authenticated" on public.vacation_requests
+create policy "requests_read_own_or_admin" on public.vacation_requests
 for select to authenticated
-using (true);
+using (user_id = auth.uid() or public.is_admin());
 
 -- El trabajador puede crear solicitudes solo a su nombre. El admin puede crear en nombre de cualquiera.
 drop policy if exists "requests_insert_own_or_admin" on public.vacation_requests;
