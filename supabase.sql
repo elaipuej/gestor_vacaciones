@@ -21,8 +21,12 @@ create table if not exists public.vacation_requests (
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
   created_at timestamptz not null default now(),
   reviewed_at timestamptz,
+  review_comment text,
   constraint valid_date_range check (end_date >= start_date)
 );
+
+alter table public.vacation_requests
+  add column if not exists review_comment text;
 
 create table if not exists public.holidays (
   id uuid primary key default gen_random_uuid(),
@@ -50,6 +54,23 @@ begin
 end;
 $$;
 
+-- El formulario muestra nombres, pero Supabase Auth necesita el correo para iniciar sesión.
+create or replace function public.list_login_profiles()
+returns table (id uuid, full_name text, email text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, p.full_name, u.email::text
+  from public.profiles as p
+  join auth.users as u on u.id = p.id
+  order by p.full_name;
+$$;
+
+revoke all on function public.list_login_profiles() from public, anon, authenticated;
+grant execute on function public.list_login_profiles() to anon, authenticated;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
@@ -69,11 +90,12 @@ drop policy if exists "profiles_update_admin" on public.profiles;
 create policy "profiles_update_admin" on public.profiles
 for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
--- Cada trabajador ve sus solicitudes y las aprobadas del equipo.
+-- Todos los usuarios autenticados pueden consultar las solicitudes del equipo.
 drop policy if exists "requests_read_own_or_approved_or_admin" on public.vacation_requests;
-create policy "requests_read_own_or_approved_or_admin" on public.vacation_requests
+drop policy if exists "requests_read_authenticated" on public.vacation_requests;
+create policy "requests_read_authenticated" on public.vacation_requests
 for select to authenticated
-using (user_id = auth.uid() or status = 'approved' or public.is_admin());
+using (true);
 
 -- El trabajador puede crear solicitudes solo a su nombre. El admin puede crear en nombre de cualquiera.
 drop policy if exists "requests_insert_own_or_admin" on public.vacation_requests;

@@ -4,9 +4,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_SP4oKc9aqA1u5TH8Yl4zoA_6kSDBZbG";
 const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_ANON_KEY.includes("PEGA_AQUI");
 const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const $ = (id) => document.getElementById(id);
-const state = { user:null, profile:null, profiles:[], requests:[], holidays:[], view:"dashboard", mode:"month", period:new Date(), selectedYear:new Date().getFullYear() };
+const state = { user:null, profile:null, profiles:[], loginProfiles:[], requests:[], holidays:[], view:"dashboard", mode:"month", period:new Date(), selectedYear:new Date().getFullYear() };
 const monthNames = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const fmt = (s) => { if(!s) return "—"; const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d).toLocaleDateString("es-ES",{day:"2-digit",month:"short",year:"numeric"}); };
+const fmtTimestamp = (s) => s ? new Date(s).toLocaleString("es-ES",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
 const dateObj = (s) => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const daysBetween = (a,b) => Math.round((dateObj(b)-dateObj(a))/86400000)+1;
@@ -23,21 +24,20 @@ function showApp(){ $("login-screen").classList.add("hidden");$("app").classList
 async function authSubmit(e){
   e.preventDefault(); if(!db)return;
   setMessage("auth-message","");
-  const email=$("email").value.trim(), password=$("password").value;
-  const {error}=await db.auth.signInWithPassword({email,password});
+  const selected=state.loginProfiles.find(profile=>profile.id===$("login-user").value);
+  if(!selected){setMessage("auth-message","Selecciona un usuario de la lista.");return;}
+  const password=$("password").value;
+  const {error}=await db.auth.signInWithPassword({email:selected.email,password});
   if(error)setMessage("auth-message",error.message);
 }
-async function signup(){
-  if(!db)return;
-  setMessage("auth-message","");
-  const email=$("email").value.trim(),password=$("password").value;
-  if(!email||password.length<6){setMessage("auth-message","Introduce un correo y una contraseña de al menos 6 caracteres.");return;}
-  const full_name=prompt("¿Cuál es tu nombre y apellidos?");
-  if(!full_name)return;
-  const emailRedirectTo=`${window.location.origin}${window.location.pathname}`;
-  const {error}=await db.auth.signUp({email,password,options:{data:{full_name},emailRedirectTo}});
-  if(error)setMessage("auth-message",error.message);
-  else setMessage("auth-message","Cuenta creada. Si está activada la confirmación por correo, revisa tu bandeja de entrada. El administrador deberá asignarte los días anuales.");
+async function loadLoginProfiles(){
+  const {data,error}=await db.rpc("list_login_profiles");
+  if(error){setMessage("auth-message","No se pudo cargar la lista de usuarios. Comprueba que has ejecutado la actualización de supabase.sql.");return;}
+  state.loginProfiles=data||[];
+  $("login-user").innerHTML=state.loginProfiles.length
+    ? `<option value="">Selecciona tu usuario</option>${state.loginProfiles.map(profile=>`<option value="${profile.id}">${escapeHtml(profile.full_name||"Usuario")}</option>`).join("")}`
+    : `<option value="">No hay usuarios registrados</option>`;
+  $("login-btn").disabled=!state.loginProfiles.length;
 }
 async function logout(){await db.auth.signOut();state.user=null;state.profile=null;showLogin();}
 async function loadData(){
@@ -115,9 +115,10 @@ function renderYear(){
 }
 function renderRequests(){
   const filter=$("request-filter").value;
-  let rows=state.requests.filter(r=>isAdmin()||r.user_id===state.user.id);
+  let rows=[...state.requests];
   if(filter!=="all")rows=rows.filter(r=>r.status===filter);
-  $("requests-list").innerHTML=rows.length?`<table class="data-table"><thead><tr><th>Trabajador</th><th>Periodo</th><th>Días</th><th>Estado</th><th>Observaciones</th><th>Acciones</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(profileName(r.user_id))}</strong></td><td>${fmt(r.start_date)} – ${fmt(r.end_date)}</td><td>${daysBetween(r.start_date,r.end_date)}</td><td><span class="pill ${r.status}">${statusText(r.status)}</span></td><td>${escapeHtml(r.notes||"—")}</td><td>${isAdmin()&&r.status==="pending"?`<div class="table-actions"><button class="small-action approve" data-action="approve" data-id="${r.id}">Aprobar</button><button class="small-action reject" data-action="reject" data-id="${r.id}">Rechazar</button></div>`:"—"}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No hay solicitudes para mostrar.</div>`;
+  rows.sort((a,b)=>a.created_at.localeCompare(b.created_at));
+  $("requests-list").innerHTML=rows.length?`<table class="data-table"><thead><tr><th>Trabajador</th><th>Solicitada</th><th>Periodo</th><th>Días</th><th>Estado</th><th>Observaciones</th><th>Comentario administrador</th><th>Acciones</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(profileName(r.user_id))}</strong></td><td>${fmtTimestamp(r.created_at)}</td><td>${fmt(r.start_date)} – ${fmt(r.end_date)}</td><td>${daysBetween(r.start_date,r.end_date)}</td><td><span class="pill ${r.status}">${statusText(r.status)}</span></td><td>${escapeHtml(r.notes||"—")}</td><td>${escapeHtml(r.review_comment||"—")}</td><td>${isAdmin()&&r.status==="pending"?`<div class="table-actions"><button class="small-action approve" data-action="approve" data-id="${r.id}">Aprobar</button><button class="small-action reject" data-action="reject" data-id="${r.id}">Rechazar</button></div>`:"—"}</td></tr>`).join("")}</tbody></table>`:`<div class="empty">No hay solicitudes para mostrar.</div>`;
 }
 function renderEmployees(){
   if(!isAdmin())return;
@@ -128,7 +129,7 @@ function renderHolidays(){
   $("holidays-list").innerHTML=state.holidays.length?`<table class="data-table"><thead><tr><th>Fecha</th><th>Festivo</th><th></th></tr></thead><tbody>${state.holidays.map(h=>`<tr><td>${fmt(h.date)}</td><td><strong>${escapeHtml(h.name)}</strong></td><td><button class="small-action reject" data-delete-holiday="${h.id}">Eliminar</button></td></tr>`).join("")}</tbody></table>`:`<div class="empty">Todavía no has añadido festivos.</div>`;
 }
 function renderReports(){
-  const rows=state.requests.filter(r=>isAdmin()||r.user_id===state.user.id);
+  const rows=state.requests;
   $("report-summary").innerHTML=`<div><strong>${rows.length}</strong><span>Solicitudes visibles</span></div><div><strong>${rows.filter(r=>r.status==="approved").length}</strong><span>Aprobadas</span></div><div><strong>${rows.filter(r=>r.status==="pending").length}</strong><span>Pendientes</span></div>`;
 }
 function openRequest(){
@@ -160,9 +161,21 @@ async function submitRequest(e){
   if(error){setMessage("request-error",error.message);return;}
   $("request-dialog").close();toast("Solicitud enviada correctamente.");await loadData();
 }
-async function updateRequest(id,status){
-  const {error}=await db.from("vacation_requests").update({status,reviewed_at:new Date().toISOString()}).eq("id",id);
-  if(error){toast(error.message);return;}toast(status==="approved"?"Vacaciones aprobadas":"Solicitud rechazada");await loadData();
+function openReviewDialog(id,status){
+  $("review-request-id").value=id;
+  $("review-status").value=status;
+  $("review-title").textContent=status==="approved"?"Aprobar solicitud":"Rechazar solicitud";
+  $("review-comment").value="";
+  $("review-dialog").showModal();
+}
+async function updateRequest(id,status,comment){
+  const {error}=await db.from("vacation_requests").update({status,reviewed_at:new Date().toISOString(),review_comment:comment||null}).eq("id",id);
+  if(error){toast(error.message);return false;}toast(status==="approved"?"Vacaciones aprobadas":"Solicitud rechazada");await loadData();return true;
+}
+async function saveReview(e){
+  e.preventDefault();
+  const saved=await updateRequest($("review-request-id").value,$("review-status").value,$("review-comment").value.trim());
+  if(saved)$("review-dialog").close();
 }
 async function addHoliday(e){
   e.preventDefault();const {error}=await db.from("holidays").insert({date:$("holiday-date").value,name:$("holiday-name").value.trim()});
@@ -181,7 +194,7 @@ async function saveDays(e){
 }
 function exportExcel(){
   if(!window.XLSX){toast("No se ha podido cargar el módulo Excel. Comprueba tu conexión.");return;}
-  const rows=state.requests.filter(r=>isAdmin()||r.user_id===state.user.id).map(r=>({"Trabajador":profileName(r.user_id),"Inicio":r.start_date,"Fin":r.end_date,"Días naturales":daysBetween(r.start_date,r.end_date),"Estado":statusText(r.status),"Observaciones":r.notes||""}));
+  const rows=state.requests.map(r=>({"Trabajador":profileName(r.user_id),"Solicitada":fmtTimestamp(r.created_at),"Inicio":r.start_date,"Fin":r.end_date,"Días naturales":daysBetween(r.start_date,r.end_date),"Estado":statusText(r.status),"Observaciones":r.notes||"","Comentario administrador":r.review_comment||""}));
   const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Vacaciones");
   const hol=state.holidays.map(h=>({"Fecha":h.date,"Festivo":h.name}));XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(hol),"Festivos");
   XLSX.writeFile(wb,`vacaciones-${new Date().getFullYear()}.xlsx`);
@@ -193,13 +206,15 @@ function navigate(view){
   $("page-title").textContent=({dashboard:"Resumen",calendar:"Calendario",requests:"Solicitudes",employees:"Trabajadores",holidays:"Festivos",reports:"Informes"})[view];
 }
 function bindEvents(){
-  $("auth-form").addEventListener("submit",authSubmit);$("signup-btn").addEventListener("click",signup);$("logout-btn").addEventListener("click",logout);
+  $("auth-form").addEventListener("submit",authSubmit);$("logout-btn").addEventListener("click",logout);
   document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.view)));
   document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.goto)));
   $("quick-request").addEventListener("click",openRequest);$("new-request").addEventListener("click",openRequest);
   ["start-date","end-date","request-worker"].forEach(id=>$(id).addEventListener("change",checkRequestPreview));
   $("request-form").addEventListener("submit",submitRequest);
+  $("review-form").addEventListener("submit",saveReview);
   ["close-request","cancel-request"].forEach(id=>$(id).addEventListener("click",()=>$("request-dialog").close()));
+  ["close-review","cancel-review"].forEach(id=>$(id).addEventListener("click",event=>event.target.closest("dialog").close()));
   $("request-filter").addEventListener("change",renderRequests);
   document.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>{state.mode=b.dataset.mode;document.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("selected",x===b));renderCalendar();}));
   $("prev-period").addEventListener("click",()=>{state.period.setMonth(state.period.getMonth()-(state.mode==="month"?1:12));renderCalendar();});
@@ -209,14 +224,15 @@ function bindEvents(){
   ["close-days","cancel-days"].forEach(id=>$(id).addEventListener("click",()=>$("days-dialog").close()));
   $("export-excel").addEventListener("click",exportExcel);
   document.addEventListener("click",e=>{
-    const action=e.target.closest("[data-action]");if(action)updateRequest(action.dataset.id,action.dataset.action==="approve"?"approved":"rejected");
+    const action=e.target.closest("[data-action]");if(action)openReviewDialog(action.dataset.id,action.dataset.action==="approve"?"approved":"rejected");
     const del=e.target.closest("[data-delete-holiday]");if(del)deleteHoliday(del.dataset.deleteHoliday);
     const edit=e.target.closest("[data-edit-days]");if(edit)editDays(edit.dataset.editDays,edit.dataset.days);
   });
 }
 async function boot(){
   bindEvents();
-  if(!configured){$("config-warning").classList.remove("hidden");$("login-btn").disabled=true;$("signup-btn").disabled=true;return;}
+  if(!configured){$("config-warning").classList.remove("hidden");$("login-btn").disabled=true;return;}
+  await loadLoginProfiles();
   const {data:{session}}=await db.auth.getSession();
   if(session){state.user=session.user;showApp();await loadData();}
   else showLogin();

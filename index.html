@@ -15,16 +15,15 @@
       <div class="brand-mark">GV</div>
       <p class="eyebrow">GESTIÓN DE PERSONAL</p>
       <h1>Gestor de vacaciones</h1>
-      <p class="muted">Accede para consultar o gestionar las vacaciones del equipo.</p>
+      <p class="muted">Selecciona tu usuario e introduce tu contraseña.</p>
       <div id="config-warning" class="notice warning hidden">Antes de entrar, configura la URL y la clave pública de tu proyecto Supabase en <code>app.js</code>.</div>
       <form id="auth-form">
-        <label>Correo electrónico<input id="email" type="email" autocomplete="username" required placeholder="nombre@empresa.com"></label>
+        <label>Usuario<select id="login-user" autocomplete="username" required><option value="">Cargando usuarios...</option></select></label>
         <label>Contraseña<input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Tu contraseña"></label>
-        <button class="primary full" id="login-btn">Iniciar sesión</button>
-        <button class="secondary full" id="signup-btn" type="button">Crear cuenta de trabajador</button>
+        <button class="primary full" id="login-btn" disabled>Iniciar sesión</button>
       </form>
       <p id="auth-message" class="message" aria-live="polite"></p>
-      <p class="tiny muted">El acceso requiere una cuenta autorizada. Los datos se guardan en tu base de datos privada.</p>
+      <p class="tiny muted">Si no aparece tu nombre, solicita al administrador que cree tu cuenta.</p>
     </div>
   </div>
 
@@ -110,6 +109,9 @@
   </dialog>
   <dialog id="days-dialog" class="modal small-modal">
     <form id="days-form" method="dialog"><div class="modal-head"><h2>Editar días anuales</h2><button type="button" class="close-btn" id="close-days">×</button></div><input type="hidden" id="days-user-id"><label>Días naturales anuales<input type="number" id="days-value" min="0" max="365" required></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-days">Cancelar</button><button class="primary">Guardar</button></div></form>
+    <dialog id="review-dialog" class="modal small-modal">
+      <form id="review-form" method="dialog"><div class="modal-head"><div><p class="eyebrow">REVISIÓN</p><h2 id="review-title">Revisar solicitud</h2></div><button type="button" class="close-btn" id="close-review">×</button></div><input type="hidden" id="review-request-id"><input type="hidden" id="review-status"><label>Comentario para el trabajador<textarea id="review-comment" rows="4" maxlength="1000" placeholder="Añade el motivo o algún detalle (opcional)"></textarea></label><div class="modal-actions"><button type="button" class="secondary" id="cancel-review">Cancelar</button><button class="primary">Guardar decisión</button></div></form>
+    </dialog>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
   <script src="app.js"></script>

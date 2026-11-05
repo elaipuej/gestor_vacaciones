@@ -1,3 +1,4 @@
+- Todos los usuarios autenticados pueden ver todas las solicitudes del equipo, incluidas la fecha de solicitud, el estado, las observaciones y el comentario de revisión. Solo el administrador puede aprobarlas o rechazarlas; evita incluir datos sensibles en los comentarios.
 # Gestor de Vacaciones — primera versión
 
 Aplicación web estática para publicar en GitHub Pages, con Supabase como base de datos y autenticación.
@@ -32,19 +33,20 @@ En Supabase, abre **Authentication → URL Configuration** y configura:
 
 El enlace de confirmación vuelve a la misma dirección desde la que se creó la cuenta. Supabase solo permitirá el retorno si esa dirección está incluida en **Redirect URLs**.
 
-## 3. Crear la cuenta administradora
-1. Publica la aplicación siguiendo el paso 4.
-2. Abre la web y crea tu cuenta desde **Crear cuenta de trabajador**.
-3. Si Supabase exige confirmación por correo, confirma la cuenta.
-4. En Supabase → Table Editor → `profiles`, localiza tu usuario y cambia `role` de `worker` a `admin`.
-5. Comprueba que `annual_days` tenga el número de días que corresponda (por defecto 30).
+## 3. Crear los usuarios
+1. En Supabase abre **Authentication → Users → Add user** y crea una cuenta para cada persona, con su correo y una contraseña individual. Confirma la cuenta desde el panel si Supabase lo requiere.
+2. Al crear cada cuenta se genera automáticamente un perfil. En **Table Editor → profiles**, cambia `full_name` a `Usuario1`, `Usuario2` y `Jhasmin`, según corresponda.
+3. En el perfil de Jhasmin cambia `role` de `worker` a `admin`. Los demás deben conservar el rol `worker`.
+4. Comprueba que `annual_days` tenga los días anuales que correspondan (por defecto 30).
+
+El acceso de la aplicación muestra esos nombres y cada persona inicia sesión con su propia contraseña. El correo no aparece en la pantalla, pero la aplicación estática lo consulta desde una función pública de Supabase para poder iniciar sesión; por tanto, alguien con acceso a la web podría consultar esa lista de correos. Para mantener los correos privados se necesitaría un servicio backend adicional.
 
 También puedes hacerlo desde SQL Editor, sustituyendo el correo:
 ```sql
 update public.profiles
-set role = 'admin'
+set role = 'admin', full_name = 'Jhasmin'
 where id = (
-  select id from auth.users where email = 'TU_CORREO@EMPRESA.COM'
+  select id from auth.users where email = 'CORREO_DE_JHASMIN'
 );
 ```
 
@@ -57,16 +59,16 @@ where id = (
 6. Espera a que GitHub muestre la URL pública de Pages y ábrela.
 
 ## 5. Alta de trabajadores
-Cada trabajador abre la URL y pulsa **Crear cuenta de trabajador**, indicando correo, contraseña y nombre.
+El administrador crea las cuentas autorizadas desde **Supabase → Authentication → Users → Add user**. Cada perfil nuevo aparece en el selector de acceso.
 - El perfil se crea automáticamente como `worker`.
 - El administrador ajusta sus días anuales desde **Trabajadores → Editar días**.
-- La cuenta debe usar un correo real si se activa la confirmación por correo.
+- El correo debe ser válido si se activa la confirmación por correo.
 
 ## Reglas actuales y límites de esta versión
 - Los días se cuentan como **naturales**, incluyendo inicio y fin. Sábados, domingos y festivos también cuentan.
 - Los festivos se muestran en el calendario, pero no se descuentan del cómputo de días naturales.
 - Los solapamientos generan un aviso informativo; no bloquean la solicitud ni la aprobación.
-- La aplicación muestra solicitudes aprobadas del equipo a todos los usuarios autenticados; las solicitudes pendientes y rechazadas solo las ve el trabajador propietario y el administrador.
+- Todos los usuarios autenticados pueden ver todas las solicitudes del equipo, incluidas las pendientes y rechazadas, así como sus observaciones. Solo el administrador puede aprobarlas o rechazarlas; evita incluir datos sensibles en las observaciones.
 - Los días disfrutados se suman por año según el año de inicio de la solicitud. Si una solicitud cruza de diciembre a enero, esta primera versión atribuye todos sus días al año de inicio.
 - La primera versión no envía correos ni notificaciones push.
 - Configura la política de vacaciones de la empresa antes de utilizarla oficialmente. El cálculo mostrado no sustituye la revisión de convenio, contrato ni normativa aplicable.
