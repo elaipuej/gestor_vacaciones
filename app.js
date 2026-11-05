@@ -44,13 +44,32 @@ async function authSubmit(e){
   if(error)setMessage("auth-message",error.message);
 }
 async function loadLoginProfiles(){
-  const {data,error}=await db.rpc("list_login_profiles");
-  if(error){setMessage("auth-message","No se pudo cargar la lista de usuarios. Comprueba que has ejecutado la actualización de supabase.sql.");return;}
-  state.loginProfiles=data||[];
-  $("login-user").innerHTML=state.loginProfiles.length
-    ? `<option value="">Selecciona tu usuario</option>${state.loginProfiles.map(profile=>`<option value="${profile.id}">${escapeHtml(profile.full_name||"Usuario")}</option>`).join("")}`
-    : `<option value="">No hay usuarios registrados</option>`;
-  $("login-btn").disabled=!state.loginProfiles.length;
+  const select=$("login-user"),retry=$("retry-users");
+  $("login-btn").disabled=true;
+  select.innerHTML=`<option value="">Cargando usuarios...</option>`;
+  retry.classList.add("hidden");
+  setMessage("auth-message","");
+  let timeoutId;
+  try{
+    const result=await Promise.race([
+      db.rpc("list_login_profiles"),
+      new Promise((_,reject)=>{timeoutId=setTimeout(()=>reject(new Error("Supabase no respondió en 12 segundos.")),12000);})
+    ]);
+    if(result.error)throw new Error(result.error.message);
+    state.loginProfiles=result.data||[];
+    select.innerHTML=state.loginProfiles.length
+      ? `<option value="">Selecciona tu usuario</option>${state.loginProfiles.map(profile=>`<option value="${profile.id}">${escapeHtml(profile.full_name||"Usuario")}</option>`).join("")}`
+      : `<option value="">No hay usuarios registrados</option>`;
+    $("login-btn").disabled=!state.loginProfiles.length;
+    if(!state.loginProfiles.length)setMessage("auth-message","No hay usuarios creados en Supabase.");
+  }catch(error){
+    state.loginProfiles=[];
+    select.innerHTML=`<option value="">No se pudieron cargar los usuarios</option>`;
+    setMessage("auth-message",`Error al cargar usuarios: ${error.message}`);
+    retry.classList.remove("hidden");
+  }finally{
+    clearTimeout(timeoutId);
+  }
 }
 async function logout(){await db.auth.signOut();state.user=null;state.profile=null;showLogin();}
 async function loadData(){
@@ -220,6 +239,7 @@ function navigate(view){
 }
 function bindEvents(){
   $("auth-form").addEventListener("submit",authSubmit);$("logout-btn").addEventListener("click",logout);
+  $("retry-users").addEventListener("click",loadLoginProfiles);
   $("remember-session").addEventListener("change",e=>localStorage.setItem(rememberKey,String(e.target.checked)));
   document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.view)));
   document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.goto)));

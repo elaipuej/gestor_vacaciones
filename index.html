@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#14243a">
   <title>Gestor de Vacaciones</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261105-2">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -24,6 +24,7 @@
         <button class="primary full" id="login-btn" disabled>Iniciar sesión</button>
       </form>
       <p id="auth-message" class="message" aria-live="polite"></p>
+      <button class="secondary full hidden" id="retry-users" type="button">Volver a cargar usuarios</button>
       <p class="tiny muted">Si no aparece tu nombre, solicita al administrador que cree tu cuenta.</p>
     </div>
   </div>
@@ -115,6 +116,6 @@
     </dialog>
   </dialog>
   <div id="toast" class="toast" role="status"></div>
-  <script src="app.js"></script>
+  <script src="app.js?v=20261105-2"></script>
 </body>
 </html>
