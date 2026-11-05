@@ -2,7 +2,20 @@ const SUPABASE_URL = "https://wrxtjjsuzdnatghailxv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_SP4oKc9aqA1u5TH8Yl4zoA_6kSDBZbG";
 
 const configured = SUPABASE_URL.startsWith("https://") && !SUPABASE_ANON_KEY.includes("PEGA_AQUI");
-const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const rememberKey = "gestor-vacaciones-remember-session";
+const authStorage = {
+  getItem(key){return localStorage.getItem(key)??sessionStorage.getItem(key);},
+  setItem(key,value){
+    const remember=document.getElementById("remember-session")?.checked??false;
+    const destination=remember?localStorage:sessionStorage;
+    destination.setItem(key,value);
+    (remember?sessionStorage:localStorage).removeItem(key);
+  },
+  removeItem(key){localStorage.removeItem(key);sessionStorage.removeItem(key);}
+};
+const rememberInput=document.getElementById("remember-session");
+if(rememberInput)rememberInput.checked=localStorage.getItem(rememberKey)==="true";
+const db = configured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{storage:authStorage}}) : null;
 const $ = (id) => document.getElementById(id);
 const state = { user:null, profile:null, profiles:[], loginProfiles:[], requests:[], holidays:[], view:"dashboard", mode:"month", period:new Date(), selectedYear:new Date().getFullYear() };
 const monthNames = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -207,6 +220,7 @@ function navigate(view){
 }
 function bindEvents(){
   $("auth-form").addEventListener("submit",authSubmit);$("logout-btn").addEventListener("click",logout);
+  $("remember-session").addEventListener("change",e=>localStorage.setItem(rememberKey,String(e.target.checked)));
   document.querySelectorAll(".nav-item").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.view)));
   document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>navigate(b.dataset.goto)));
   $("quick-request").addEventListener("click",openRequest);$("new-request").addEventListener("click",openRequest);

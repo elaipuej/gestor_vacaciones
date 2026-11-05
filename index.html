@@ -20,6 +20,7 @@
       <form id="auth-form">
         <label>Usuario<select id="login-user" autocomplete="username" required><option value="">Cargando usuarios...</option></select></label>
         <label>Contraseña<input id="password" type="password" autocomplete="current-password" required minlength="6" placeholder="Tu contraseña"></label>
+        <label class="remember-option"><input id="remember-session" type="checkbox"><span>Mantener sesión iniciada</span></label>
         <button class="primary full" id="login-btn" disabled>Iniciar sesión</button>
       </form>
       <p id="auth-message" class="message" aria-live="polite"></p>
